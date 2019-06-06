@@ -27,7 +27,7 @@ open Locus
 open Decl_kinds
 
 open Pcoq
-
+open Goal_select
 
 let all_with delta = Redops.make_red_flag [FBeta;FMatch;FFix;FCofix;FZeta;delta]
 
@@ -440,6 +440,13 @@ GRAMMAR EXTEND Gram
     [ [ "in"; idl = LIST1 id_or_meta -> { idl }
       | -> { [] } ] ]
   ;
+  hyp_as:
+  [ [ id = id_or_meta; ipat = as_ipat -> { (id,ipat) } ] ]
+  ;
+  in_hyp_asl:
+    [ [ "in"; hal=LIST1 hyp_as SEP "," -> { hal }
+      | -> { [] } ] ]
+  ;
   in_hyp_as:
     [ [ "in"; id = id_or_meta; ipat = as_ipat -> { Some (id,ipat) }
       | -> { None } ] ]
@@ -537,9 +544,13 @@ GRAMMAR EXTEND Gram
           { TacAtom (CAst.make ~loc @@ TacIntroPattern (true,pl)) }
       | IDENT "eintros" ->
           { TacAtom (CAst.make ~loc @@ TacIntroPattern (true,[CAst.make ~loc @@IntroForthcoming false])) }
-
       | IDENT "apply"; cl = LIST1 constr_with_bindings_arg SEP ",";
-          inhyp = in_hyp_as -> { TacAtom (CAst.make ~loc @@ TacApply (true,false,cl,inhyp)) }
+          inhyp = in_hyp_asl ->
+          { match inhyp with
+                  [] -> TacAtom (CAst.make ~loc @@ TacApply (true,false,cl, None))
+                  | _ -> let tactics = List.map (fun x -> TacSelect (SelectNth 1, TacAtom (CAst.make ~loc @@ TacApply (true,false,cl, Some x)))) inhyp in
+                         List.fold_left (fun x y -> TacThen (x, TacSelect (SelectNth 1, y))) (List.hd tactics) (List.tl tactics)
+        }
       | IDENT "eapply"; cl = LIST1 constr_with_bindings_arg SEP ",";
           inhyp = in_hyp_as -> { TacAtom (CAst.make ~loc @@ TacApply (true,true,cl,inhyp)) }
       | IDENT "simple"; IDENT "apply";
