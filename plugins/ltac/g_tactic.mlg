@@ -441,7 +441,7 @@ GRAMMAR EXTEND Gram
       | -> { [] } ] ]
   ;
   hyp_as:
-  [ [ id = id_or_meta; ipat = as_ipat -> { (id,ipat) } ] ]
+  [ [ id = id_or_meta; ipat = as_ipat -> { (id, ipat) } ] ]
   ;
   in_hyp_as_list:
     [ [ "in"; hal=LIST1 hyp_as SEP "," -> { Some hal }

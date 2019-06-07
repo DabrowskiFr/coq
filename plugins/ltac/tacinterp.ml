@@ -1611,32 +1611,27 @@ and interp_atomic ist tac : unit Proofview.tactic =
 	let l = List.map (fun (k,c) ->
             let loc, f = interp_open_constr_with_bindings_loc ist c in
             (k,(make ?loc f))) cb in
-        let sigma,tac = match cl with
+        let sigma, tac = match cl with
           | None -> sigma, Tactics.apply_with_delayed_bindings_gen a ev l
-          | Some [] -> failwith "OUCH"
-          | Some (cl::t) ->
-              let sigma, (id,cl) = interp_in_hyp_as ist env sigma cl in
-              let sigma, k =
+          | Some [] -> anomaly (str "Empty in clause in apply")
+          | Some t ->
+            let sigma, tacl =
               List.fold_right
-                (fun cl (s,l) ->
-                   let sigma, (id,cl)  = interp_in_hyp_as ist env s cl in
-                   sigma, (id,cl)::l
+                (fun cl (sigma, tacl) ->
+                   let sigma, (id,cl)  = interp_in_hyp_as ist env sigma cl in
+                   sigma, (Tactics.apply_delayed_in a ev id l cl)::tacl
                 )
-                t (sigma, [(id,cl)])
-              in
-              let m = List.map
-                  (fun (id,cl) -> Tactics.apply_delayed_in a ev id l cl) k
+                t (sigma, [])
               in let tac =
-              List.fold_left
-                (fun (x : unit Proofview.tactic) y ->
-                   Tacticals.New.tclTHEN
-                    x (Tacticals.New.tclSELECT (Goal_select.SelectNth 1) y))
-                (List.hd m) (List.tl m)
-                in sigma, tac
-         in Tacticals.New.tclWITHHOLES ev tac sigma
-          (* Tacticals.tclTHEN *)
+                   List.fold_left
+                     (fun tac tac' ->
+                        Tacticals.New.tclTHEN
+                          tac (Tacticals.New.tclSELECT (Goal_select.SelectNth 1) tac'))
+                     (List.hd tacl) (List.tl tacl)
+              in sigma, tac
+        in Tacticals.New.tclWITHHOLES ev tac sigma
       end
-        end
+    end
   | TacElim (ev,(keep,cb),cbo) ->
       Proofview.Goal.enter begin fun gl ->
         let env = Proofview.Goal.env gl in
@@ -1838,8 +1833,6 @@ and interp_atomic ist tac : unit Proofview.tactic =
         Tactics.change ~check (Some op) c_interp (interp_clause ist env sigma cl)
       end
       end
-
-
   (* Equality and inversion *)
   | TacRewrite (ev,l,cl,by) ->
       Proofview.Goal.enter begin fun gl ->
