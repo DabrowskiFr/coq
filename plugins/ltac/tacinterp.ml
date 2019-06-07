@@ -848,7 +848,10 @@ let interp_intro_pattern_option ist env sigma = function
 
 let interp_in_hyp_as ist env sigma (id,ipat) =
   let sigma, ipat = interp_intro_pattern_option ist env sigma ipat in
-  sigma,(interp_hyp ist env sigma id,ipat)
+  sigma, (interp_hyp ist env sigma id,ipat)
+
+(*let interp_in_hyp_asl ist env sigma cl =
+  List.map (fun (x,y) -> interp_intro_pattern_option ist env sigma y) cl*)
 
 let interp_binding_name ist env sigma = function
   | AnonHyp n -> AnonHyp n
@@ -1606,17 +1609,34 @@ and interp_atomic ist tac : unit Proofview.tactic =
         let env = Proofview.Goal.env gl in
         let sigma = project gl in
 	let l = List.map (fun (k,c) ->
-          let loc, f = interp_open_constr_with_bindings_loc ist c in
-            (k,(make ?loc f))) cb
-	in
+            let loc, f = interp_open_constr_with_bindings_loc ist c in
+            (k,(make ?loc f))) cb in
         let sigma,tac = match cl with
           | None -> sigma, Tactics.apply_with_delayed_bindings_gen a ev l
-          | Some cl ->
-              let sigma,(id,cl) = interp_in_hyp_as ist env sigma cl in
-              sigma, Tactics.apply_delayed_in a ev id l cl in
-        Tacticals.New.tclWITHHOLES ev tac sigma
+          | Some [] -> failwith "OUCH"
+          | Some (cl::t) ->
+              let sigma, (id,cl) = interp_in_hyp_as ist env sigma cl in
+              let sigma, k =
+              List.fold_right
+                (fun cl (s,l) ->
+                   let sigma, (id,cl)  = interp_in_hyp_as ist env s cl in
+                   sigma, (id,cl)::l
+                )
+                t (sigma, [(id,cl)])
+              in
+              let m = List.map
+                  (fun (id,cl) -> Tactics.apply_delayed_in a ev id l cl) k
+              in let tac =
+              List.fold_left
+                (fun (x : unit Proofview.tactic) y ->
+                   Tacticals.New.tclTHEN
+                    x (Tacticals.New.tclSELECT (Goal_select.SelectNth 1) y))
+                (List.hd m) (List.tl m)
+                in sigma, tac
+         in Tacticals.New.tclWITHHOLES ev tac sigma
+          (* Tacticals.tclTHEN *)
       end
-      end
+        end
   | TacElim (ev,(keep,cb),cbo) ->
       Proofview.Goal.enter begin fun gl ->
         let env = Proofview.Goal.env gl in
