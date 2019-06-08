@@ -848,10 +848,7 @@ let interp_intro_pattern_option ist env sigma = function
 
 let interp_in_hyp_as ist env sigma (id,ipat) =
   let sigma, ipat = interp_intro_pattern_option ist env sigma ipat in
-  sigma, (interp_hyp ist env sigma id,ipat)
-
-(*let interp_in_hyp_asl ist env sigma cl =
-  List.map (fun (x,y) -> interp_intro_pattern_option ist env sigma y) cl*)
+  sigma,(interp_hyp ist env sigma id,ipat)
 
 let interp_binding_name ist env sigma = function
   | AnonHyp n -> AnonHyp n
