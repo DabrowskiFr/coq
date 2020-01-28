@@ -1611,20 +1611,21 @@ and interp_atomic ist tac : unit Proofview.tactic =
         let sigma, tac = match cl with
           | None -> sigma, Tactics.apply_with_delayed_bindings_gen a ev l
           | Some [] -> anomaly (str "Empty in clause in apply")
-          | Some t ->
-            let sigma, tacl =
+          | Some cl_list ->
+            let sigma, tac_list =
               List.fold_right
-                (fun cl (sigma, tacl) ->
-                   let sigma, (id,cl)  = interp_in_hyp_as ist env sigma cl in
-                   sigma, (Tactics.apply_delayed_in a ev id l cl)::tacl
+                (fun cl (sigma, tac_list) ->
+                   let sigma, (id,cl)  =
+                     interp_in_hyp_as ist env sigma cl
+                   in sigma, (Tactics.apply_delayed_in a ev id l cl)::tac_list
                 )
-                t (sigma, [])
+                cl_list (sigma, [])
               in let tac =
                    List.fold_left
                      (fun tac tac' ->
                         Tacticals.New.tclTHEN
                           tac (Tacticals.New.tclSELECT (Goal_select.SelectNth 1) tac'))
-                     (List.hd tacl) (List.tl tacl)
+                     (List.hd tac_list) (List.tl tac_list)
               in sigma, tac
         in Tacticals.New.tclWITHHOLES ev tac sigma
       end
